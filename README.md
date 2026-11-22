@@ -8,6 +8,26 @@ A lightweight Python static-analysis tool for JADX output. It identifies exporte
 - JADX decompiled output containing `resources/AndroidManifest.xml` and `sources/`
 - No third-party Python packages
 
+## Installation
+
+Clone the repository:
+
+```bash
+git clone https://github.com/Cookies307/Android-Intent-Extra-Mapper.git
+```
+
+Navigate to the project directory:
+
+```bash
+cd Android-Intent-Extra-Mapper
+```
+
+Run the tool:
+
+```bash
+python intent_extra_mapper.py -InputPath "path\to\jadx-output"
+```
+
 ## Usage
 
 ```powershell
