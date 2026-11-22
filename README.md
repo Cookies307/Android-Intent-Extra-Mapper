@@ -22,12 +22,6 @@ Navigate to the project directory:
 cd Android-Intent-Extra-Mapper
 ```
 
-Run the tool:
-
-```bash
-python intent_extra_mapper.py -InputPath "path\to\jadx-output"
-```
-
 ## Usage
 
 ```powershell
