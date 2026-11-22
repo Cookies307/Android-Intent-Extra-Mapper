@@ -7,7 +7,6 @@ missed when values flow through helper methods/wrappers or non-literal constants
 from __future__ import annotations
 
 import argparse
-import csv
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -232,7 +231,7 @@ def scan_method_body(body: str) -> list[dict[str, str]]:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Find Intent extras read by exported Android activities in JADX output.")
     parser.add_argument("-InputPath", required=True, help="JADX output directory")
-    parser.add_argument("-OutputPath", help="CSV report path (default: Intent-Extras-Report.csv in input directory)")
+    parser.add_argument("-OutputPath", help="Markdown report path (default: Intent-Extras-Report.md in input directory)")
     parser.add_argument("-ManifestPath", help="Optional explicit AndroidManifest.xml path")
     args = parser.parse_args()
 
@@ -277,22 +276,45 @@ def main() -> int:
         else:
             rows.append({**base, "method_scope": "onCreate/onNewIntent", "extra_key": "", "extra_type": "", "getter": "", "key_confidence": "", "status": "No extras detected in onCreate/onNewIntent"})
 
-    output = Path(args.OutputPath).expanduser().resolve() if args.OutputPath else root / "Intent-Extras-Report.csv"
+    output = Path(args.OutputPath).expanduser().resolve() if args.OutputPath else root / "Intent-Extras-Report.md"
     output.parent.mkdir(parents=True, exist_ok=True)
-    fields = ["activity", "code_class", "component_type", "export_reason", "source_file", "method_scope", "extra_key", "extra_type", "getter", "key_confidence", "status"]
-    with output.open("w", newline="", encoding="utf-8-sig") as f:
-        writer = csv.DictWriter(f, fieldnames=fields)
-        writer.writeheader()
-        writer.writerows(rows)
 
     detected = sum(1 for row in rows if row["status"] == "Extra detected")
     missing = sum(1 for row in rows if row["status"] == "No extras detected in onCreate/onNewIntent")
     unresolved = sum(1 for row in rows if row["status"] in ("Source not found", "Source unreadable"))
+
+    def md(value: object) -> str:
+        return str(value).replace("|", "\\|").replace("\r", " ").replace("\n", " ")
+
+    with output.open("w", encoding="utf-8") as f:
+        f.write("# Android Intent Extra Mapper Report\n\n")
+        f.write(f"- **Package:** `{md(package or 'unknown')}`\n")
+        f.write(f"- **Target SDK:** `{md(target_sdk)}`\n")
+        f.write(f"- **Manifest:** `{md(manifest)}`\n")
+        f.write(f"- **Exported components:** {len(exported)}\n")
+        f.write(f"- **Detected extra reads:** {detected}\n")
+        f.write(f"- **Activities with no supported extras found:** {missing}\n")
+        f.write(f"- **Source review required:** {unresolved}\n\n")
+        f.write("## Results\n\n")
+        headers = ["Activity", "Source class", "Type", "Source file", "Method", "Extra key", "Extra type", "Getter", "Confidence", "Status"]
+        f.write("| " + " | ".join(headers) + " |\n")
+        f.write("|" + "|".join(["---"] * len(headers)) + "|\n")
+        for row in rows:
+            values = [row["activity"], row["code_class"], row["component_type"], row["source_file"], row["method_scope"], row["extra_key"], row["extra_type"], row["getter"], row["key_confidence"], row["status"]]
+            f.write("| " + " | ".join(md(value) for value in values) + " |\n")
+        f.write("\n## Limitations\n\n")
+        f.write("- Static analysis only; this tool does not execute the app or send Intents.\n")
+        f.write("- It analyzes supported getter calls directly inside `onCreate()` and `onNewIntent()`.\n")
+        f.write("- Helper methods, wrappers, reflection, indirect flows, and dynamically constructed keys may be missed.\n")
+        f.write("- Constant identifiers are reported by name and are not resolved to their definitions.\n")
+        f.write("- `getExtras()` indicates a Bundle, but individual Bundle keys are not enumerated.\n")
+        f.write("- A detected extra is an investigation lead, not a vulnerability by itself.\n")
+
     print(f"[+] Extra reads     : {detected}")
     print(f"[+] No extras found : {missing}")
     print(f"[!] Review needed   : {unresolved}")
-    print(f"[+] CSV report      : {output}")
-    print("[!] Static analysis only: helper methods, wrappers, reflection, dynamic keys, and indirect Intent flows may be missed.")
+    print(f"[+] Markdown report : {output}")
+
     return 0
 
 if __name__ == "__main__":
